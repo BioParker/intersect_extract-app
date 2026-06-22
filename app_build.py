@@ -1,0 +1,124 @@
+import streamlit as st
+
+st.title('$intersect')
+
+st.markdown("for full explanation of bedtools intersect options, see [here](https://bedtools.readthedocs.io/en/latest/content/tools/intersect.html)")
+
+with st.container(border=True):
+    st.badge("-a", color="primary")
+    st.caption("Set of features to filter, BED or GTF file")
+    afile = st.file_uploader("*a-file", type=["bed", "gtf"],label_visibility="collapsed")
+
+
+with st.container(border=True):
+    st.badge("-b", color="primary")
+    st.caption("Features to intersect against. Please provide a single set of coordinates or a BED file")
+    boption = st.segmented_control("boption",
+                               ["coordinates", "bed"],
+                                   label_visibility="collapsed")
+    if boption == "coordinates":
+        coordinates = st.text_input("Select coordinates to intersect with in the format *chr:start-end*")
+    elif boption == "bed":
+        bfile = st.file_uploader("*b-file", type=["bed", "gtf"], label_visibility="collapsed")
+
+dofrac = st.toggle("Toggle for the -f option, which sets the minimum required overlap fraction",
+                   False)
+
+recip = False
+if dofrac:
+    recip = st.toggle("Toggle for the -r option, which determines whether the -f fraction is reciprocal"
+                       "\nFor exact matches, use -r and set the -f slider to 1",
+                       False)
+    f = st.slider("-f",
+                  min_value=0.0,
+                  max_value=1.0,
+                  width=100)
+else:
+    f = None
+
+strand = st.toggle("Toggle for the -s option, which enforces strand matching",
+                   False)
+
+import subprocess
+import tempfile
+import shutil
+import os
+
+st.divider()
+run = st.button("Run intersect", type="primary")
+
+if run:
+    # --- validate ---
+    if afile is None:
+        st.error("Upload an -a file first.")
+        st.stop()
+    if boption is None:
+        st.error("Choose a -b input: coordinates or a BED file.")
+        st.stop()
+    if shutil.which("bedtools") is None:
+        st.error("bedtools isn't on PATH — activate the conda env that has it.")
+        st.stop()
+
+    with tempfile.TemporaryDirectory() as td:
+        # stage -a, keeping its extension so bedtools detects BED vs GTF
+        a_suffix = os.path.splitext(afile.name)[1] or ".bed"
+        a_path = os.path.join(td, "a" + a_suffix)
+        with open(a_path, "wb") as fh:
+            fh.write(afile.getvalue())
+
+        # build -b
+        b_path = os.path.join(td, "b.bed")
+        if boption == "coordinates":
+            try:
+                s = coordinates.strip().replace(",", "")
+                chrom, _, rng = s.partition(":")
+                start_s, _, end_s = rng.partition("-")
+                start1, end1 = int(start_s), int(end_s)
+                if not chrom or end1 < start1:
+                    raise ValueError
+            except (ValueError, AttributeError):
+                st.error("Coordinates must look like chr:start-end, e.g. chr1:1000-2000.")
+                st.stop()
+            # convert coordinates to BED format
+            with open(b_path, "w") as fh:
+                fh.write(f"{chrom}\t{start1 - 1}\t{end1}\n")
+        else:  # "bed"
+            if bfile is None:
+                st.error("Upload a -b BED file.")
+                st.stop()
+            with open(b_path, "wb") as fh:
+                fh.write(bfile.getvalue())
+
+        # --- build command for subprocess ---
+        cmd = ["bedtools", "intersect", "-a", a_path, "-b", b_path, "-u"]
+        if f:            # check f truthiness  - None or 0.0 -> omit (bedtools needs -f > 0)
+            cmd += ["-f", str(f)]
+        if recip:
+            cmd += ["-r"]
+        if strand:
+            cmd += ["-s"]
+
+        # --- run ---
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        st.session_state["result"] = {
+            "cmd": " ".join(cmd),
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+            "rc": proc.returncode,
+            "ext": a_suffix.lstrip(".") or "bed",
+        }
+
+# --- show last result (kept in session_state so it survives the download rerun) ---
+res = st.session_state.get("result")
+if res:
+    st.code(res["cmd"], language="bash")
+    if res["rc"] != 0:
+        st.error(f"bedtools exited with code {res['rc']}")
+    if res["stderr"].strip():
+        st.warning(res["stderr"].strip())
+    out = res["stdout"]
+    n = out.count("\n") if out.strip() else 0
+    st.caption(f"{n} feature(s) retained")
+    st.code(out or "(no overlaps)", language="text")
+    if out.strip():
+        st.download_button("Download", out, file_name=f"intersect.{res['ext']}")

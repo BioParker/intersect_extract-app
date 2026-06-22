@@ -1,0 +1,23 @@
+[theme]
+base = "dark"                              # inherit dark defaults, override below
+
+primaryColor = "#4cc8a3"                   # --accent: toggles, sliders, focus borders
+backgroundColor = "#0e1218"                # --bg: main canvas
+secondaryBackgroundColor = "#171d27"       # --panel: sidebar + widget fills
+textColor = "#dce4ee"                      # --ink
+linkColor = "#4cc8a3"                      # --accent, to match
+
+borderColor = "#2a3442"                    # --line: widget/container borders
+showWidgetBorder = true                    # the tool showed input borders at rest, not just on focus
+
+codeBackgroundColor = "#0a0d12"            # the tool's output/code panels
+codeTextColor = "#dce4ee"
+
+baseRadius = "0.5rem"                       # ~8px, matches the tool's inputs
+buttonRadius = "0.625rem"                   # ~10px, matches the run button
+
+dataframeBorderColor = "#2a3442"           # in case you render tables
+dataframeHeaderBackgroundColor = "#1c2431" # --panel-2
+
+[server]
+maxUploadSize = 2000
