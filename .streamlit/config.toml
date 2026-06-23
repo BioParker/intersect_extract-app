@@ -20,4 +20,4 @@ dataframeBorderColor = "#2a3442"           # in case you render tables
 dataframeHeaderBackgroundColor = "#1c2431" # --panel-2
 
 [server]
-maxUploadSize = 2000
+maxUploadSize = 5000

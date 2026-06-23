@@ -1,4 +1,9 @@
 import streamlit as st
+import subprocess
+import tempfile
+import shutil
+import os
+import io
 
 st.title('$intersect')
 
@@ -9,16 +14,22 @@ with st.container(border=True):
     st.caption("Set of features to filter, BED or GTF file")
     afile = st.file_uploader("*a-file", type=["bed", "gtf"],label_visibility="collapsed")
 
+if afile and os.path.splitext(afile.name)[1] == ".gtf":
+    with st.container(border=True):
+        st.badge("Feature type", color="primary")
+        st.caption("Select feature type from -a to extract")
+        ftype = st.selectbox("Select feature type",
+                             ["all", "transcript", "exon"])
 
 with st.container(border=True):
     st.badge("-b", color="primary")
-    st.caption("Features to intersect against. Please provide a single set of coordinates or a BED file")
+    st.caption("Features to intersect against. Please provide a single set of coordinates or a file in an appropriate format (BED/GTF)")
     boption = st.segmented_control("boption",
-                               ["coordinates", "bed"],
+                               ["coordinates", "file"],
                                    label_visibility="collapsed")
     if boption == "coordinates":
         coordinates = st.text_input("Select coordinates to intersect with in the format *chr:start-end*")
-    elif boption == "bed":
+    elif boption == "file":
         bfile = st.file_uploader("*b-file", type=["bed", "gtf"], label_visibility="collapsed")
 
 dofrac = st.toggle("Toggle for the -f option, which sets the minimum required overlap fraction",
@@ -39,13 +50,10 @@ else:
 strand = st.toggle("Toggle for the -s option, which enforces strand matching",
                    False)
 
-import subprocess
-import tempfile
-import shutil
-import os
-
 st.divider()
 run = st.button("Run intersect", type="primary")
+
+#--------------------------- run -----------------------------------#
 
 if run:
     # --- validate ---
@@ -62,9 +70,22 @@ if run:
     with tempfile.TemporaryDirectory() as td:
         # stage -a, keeping its extension so bedtools detects BED vs GTF
         a_suffix = os.path.splitext(afile.name)[1] or ".bed"
-        a_path = os.path.join(td, "a" + a_suffix)
-        with open(a_path, "wb") as fh:
-            fh.write(afile.getvalue())
+        if a_suffix == ".gtf":
+            a_path = os.path.join(td, "a.gtf")
+            #keep = set(ftype)
+            text_stream = io.TextIOWrapper(afile, encoding="utf-8")
+            with open(a_path, "w") as out_fh:
+                for line in text_stream:
+                    if line.startswith("#"):
+                        out_fh.write(line)
+                        continue
+                    cols = line.rstrip("\n").split("\t")
+                    if len(cols) > 2 and (not ftype or ftype == "all" or cols[2] == ftype):
+                        out_fh.write(line)
+        else:
+            a_path = os.path.join(td, "a" + a_suffix)
+            with open(a_path, "wb") as fh:
+                fh.write(afile.getvalue())
 
         # build -b
         b_path = os.path.join(td, "b.bed")
@@ -82,12 +103,13 @@ if run:
             # convert coordinates to BED format
             with open(b_path, "w") as fh:
                 fh.write(f"{chrom}\t{start1 - 1}\t{end1}\n")
-        else:  # "bed"
+        else:  # "bed/gtf"
             if bfile is None:
-                st.error("Upload a -b BED file.")
+                st.error("Upload a -b BED/GTF file.")
                 st.stop()
             with open(b_path, "wb") as fh:
                 fh.write(bfile.getvalue())
+
 
         # --- build command for subprocess ---
         cmd = ["bedtools", "intersect", "-a", a_path, "-b", b_path, "-u"]
@@ -98,10 +120,16 @@ if run:
         if strand:
             cmd += ["-s"]
 
+        #making user-readable header
+        b_label = bfile.name if boption == "file" else coordinates
+        pheader = ["bedtools", "intersect", "-a", afile.name, "-b", b_label, "-u"]
+        if f:      pheader += ["-f", str(f)]
+        if recip:  pheader += ["-r"]
+        if strand: pheader += ["-s"]
         # --- run ---
         proc = subprocess.run(cmd, capture_output=True, text=True)
         st.session_state["result"] = {
-            "cmd": " ".join(cmd),
+            "cmd": " ".join(pheader),
             "stdout": proc.stdout,
             "stderr": proc.stderr,
             "rc": proc.returncode,
@@ -121,4 +149,5 @@ if res:
     st.caption(f"{n} feature(s) retained")
     st.code(out or "(no overlaps)", language="text")
     if out.strip():
-        st.download_button("Download", out, file_name=f"intersect.{res['ext']}")
+        header = f"# $intersect-app {res['cmd']}\n"
+        st.download_button("Download", header + out, file_name=f"intersect.{res['ext']}")
