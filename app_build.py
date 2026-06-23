@@ -147,7 +147,7 @@ if res:
     out = res["stdout"]
     n = out.count("\n") if out.strip() else 0
     st.caption(f"{n} feature(s) retained")
-    st.code(out or "(no overlaps)", language="text")
     if out.strip():
         header = f"# $intersect-app {res['cmd']}\n"
         st.download_button("Download", header + out, file_name=f"intersect.{res['ext']}")
+    st.code(out or "(no overlaps)", language="text")
