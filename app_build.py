@@ -114,7 +114,7 @@ if run:
         a_suffix = os.path.splitext(afile.name)[1] or ".bed"
         if a_suffix == ".gtf":
             a_path = os.path.join(td, "a.gtf")
-            #keep = set(ftype)
+            afile.seek(0)
             text_stream = io.TextIOWrapper(afile, encoding="utf-8")
             with open(a_path, "w") as out_fh:
                 for line in text_stream:
