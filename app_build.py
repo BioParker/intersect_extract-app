@@ -4,6 +4,7 @@ import tempfile
 import shutil
 import os
 import io
+import pandas as pd
 
 st.markdown(
     """
@@ -55,10 +56,12 @@ with st.container(border=True):
 
 if afile and os.path.splitext(afile.name)[1] == ".gtf":
     with st.container(border=True):
+        df = pd.read_csv(afile, sep="\t", header=None, comment="#", usecols=[2])
+        feature_types = ["all"] + sorted(df[2].unique())
         st.badge("Feature type", color="primary")
         st.caption("Select feature type from -a to extract")
         ftype = st.selectbox("Select feature type",
-                             ["all", "transcript", "exon"])
+                              feature_types)
 
 with st.container(border=True):
     st.badge("-b", color="primary")
@@ -67,7 +70,7 @@ with st.container(border=True):
                                ["coordinates", "file"],
                                    label_visibility="collapsed")
     if boption == "coordinates":
-        coordinates = st.text_input("Select coordinates to intersect with in the format *chr:start-end*")
+        coordinates = st.text_input("Input coordinates to intersect with **-a** in the format *chr:start-end*, 1-based")
     elif boption == "file":
         bfile = st.file_uploader("*b-file", type=["bed", "gtf"], label_visibility="collapsed")
 
