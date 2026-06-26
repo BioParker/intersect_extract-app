@@ -8,7 +8,6 @@ import pandas as pd
 
 def animated_title(word: str):
     key = "".join(ch for ch in word.lower() if ch.isalnum())  # css-safe suffix
-    steps = len(word)
     st.markdown(
         f"""
         <style>
@@ -33,24 +32,21 @@ def animated_title(word: str):
             left: 0;
             top: 0;
             white-space: nowrap;
-            overflow: hidden;
-            width: 0;
-            animation: typing-{key} 1.4s steps({steps}, end) forwards;
+            opacity: 0;                  /* start invisible, fade in */
+            animation: fade-{key} 1.2s ease forwards;
         }}
 
-        @keyframes typing-{key} {{ to {{ width: 100%; }} }}
+        @keyframes fade-{key} {{ to {{ opacity: 1; }} }}
 
         .type-wrap-{key}::after {{
             content: ""; position: absolute; left: 0; bottom: 0;
             height: 3px; width: 0; background: #4CC8A3;
-            animation: underline-{key} 1s ease forwards;
-            animation-delay: 1.4s;
+            animation: underline-{key} 1.2s ease forwards;
         }}
         .type-wrap-{key}::before {{
             content: ""; position: absolute; top: 0; right: 0;
             width: 3px; height: 0; background: #4CC8A3;
-            animation: draw-vert-{key} 1s ease forwards;
-            animation-delay: 1.4s;
+            animation: draw-vert-{key} 1.2s ease forwards;
         }}
         @keyframes underline-{key} {{ to {{ width: 120%; }} }}
         @keyframes draw-vert-{key} {{ to {{ height: 120%; }} }}
@@ -103,25 +99,25 @@ def animated_title_boxed(word: str):
         .type-wrap-{key} .bx-bottom {{
             left: 0; bottom: 0; height: 3px; width: 0;
             animation: bx-h-{key} 0.45s ease forwards;
-            animation-delay: 1.2s;
+            animation-delay: 0s;
         }}
         /* 2. right: bottom → top */
         .type-wrap-{key} .bx-right {{
             right: 0; bottom: 0; width: 3px; height: 0;
             animation: bx-v-{key} 0.45s ease forwards;
-            animation-delay: 1.65s;
+            animation-delay: 0.45s;
         }}
         /* 3. top: right → left */
         .type-wrap-{key} .bx-top {{
             right: 0; top: 0; height: 3px; width: 0;
             animation: bx-h-{key} 0.45s ease forwards;
-            animation-delay: 2.1s;
+            animation-delay: 0.9s;
         }}
         /* 4. left: top → bottom */
         .type-wrap-{key} .bx-left {{
             left: 0; top: 0; width: 3px; height: 0;
             animation: bx-v-{key} 0.45s ease forwards;
-            animation-delay: 2.55s;
+            animation-delay: 1.35s;
         }}
         @keyframes bx-h-{key} {{ to {{ width: 100%; }} }}
         @keyframes bx-v-{key} {{ to {{ height: 100%; }} }}
