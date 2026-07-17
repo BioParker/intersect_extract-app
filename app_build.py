@@ -536,7 +536,7 @@ if mode == "Extract":
         st.caption(f"{n} row(s) matched")
         if r["gtf_out"]:
             header = f"# extract-app  {r['atype']} in {sorted(r['vlist'])}\n"
-            st.download_button("GTF_Download", header + output + "\n",
+            st.download_button("GTF Download", header + output + "\n",
                                file_name="extracted.gtf")
             st.code(output, language="text")
         else:
@@ -546,7 +546,7 @@ if mode == "Extract":
         foutput = "\n".join(r["fa_out"])
         n = len(r["fa_out"])
         if r["fa_out"]:
-            st.download_button("FASTA_Download", foutput + "\n",
+            st.download_button("FASTA Download", foutput + "\n",
                                file_name="extracted.fa")
             st.code(foutput, language="text")
         else:
