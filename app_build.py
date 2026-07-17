@@ -413,6 +413,19 @@ if mode == "Extract":
                                   attr_name,
                                   label_visibility="collapsed")
 
+            fextract = False
+            if atype == "transcript_id":
+                with st.container(border=True):
+                    fextract = st.toggle("Toggle for whether to extract transcript sequences in FASTA format",
+                                         False)
+
+            if fextract:
+                with st.container(border=True):
+                    st.caption("Upload master FASTA for transcripts")
+                    st.badge("-mFASTA", color="primary")
+                    mfasta = st.file_uploader("*fa-file", type=["FASTA","fasta","fa"], label_visibility="collapsed")
+
+
             with st.container(border=True):
                 st.badge("Attribute values", color="primary")
                 st.caption(f"Input a single value, or a text file with one value per line."
@@ -441,6 +454,9 @@ if mode == "Extract":
             if vfile is None:
                 st.error("Upload a values file")
                 st.stop()
+        if fextract and mfasta is None:
+            st.error("Upload a master FASTA file")
+            st.stop()
 
         vlist=set()
         if voption == "text input":
@@ -465,17 +481,77 @@ if mode == "Extract":
                         if aname == atype and aval.strip().strip('"') in vlist:
                             outlines.append(line.rstrip("\n"))
 
+        faOut=[]
+        if fextract and mfasta is not None:
+            fa_txt = mfasta.getvalue().decode(encoding="utf-8")
+            parseseq=False
+            for line in fa_txt.splitlines():
+                if line.startswith(">"):
+                    if line.removeprefix(">").rstrip("\n").split()[0] in vlist:
+                        faOut.append(line.rstrip("\n"))
+                        parseseq=True
+                    else:
+                        parseseq=False
+                elif parseseq:
+                    faOut.append(line.rstrip("\n"))
+                else:
+                    continue
+
+        st.session_state.results = {
+            "gtf_out": outlines,
+            "fa_out": faOut,
+            "atype": atype,
+            "vlist": vlist,
+        }
+
         # --- display + download --- #
-        output = "\n".join(outlines)
-        n = len(outlines)
+
+    if "results" not in st.session_state:
+        st.stop()
+
+    r = st.session_state.results
+
+    if "download" not in st.session_state:
+        st.session_state.download = "gtf"
+    d1, d2 = st.columns(2)
+
+    def _set_download(v):
+        st.session_state.download = v
+
+    with d1:
+        st.button(
+                "GTF", key="btn_gtf", use_container_width=True,
+                on_click=_set_download, args=("gtf",),
+                type="primary" if st.session_state.download == "gtf" else "secondary")
+
+    with d2:
+        st.button(
+                "FASTA", key="btn_fasta", use_container_width=True,
+                on_click=_set_download, args=("fasta",),
+                type="primary" if st.session_state.download == "fasta" else "secondary")
+
+    if st.session_state.download == "gtf":
+        output = "\n".join(r["gtf_out"])
+        n = len(r["gtf_out"])
         st.caption(f"{n} row(s) matched")
-        if outlines:
-            header = f"# extract-app  {atype} in {sorted(vlist)}\n"
-            st.download_button("Download", header + output + "\n",
+        if r["gtf_out"]:
+            header = f"# extract-app  {r['atype']} in {sorted(r['vlist'])}\n"
+            st.download_button("GTF_Download", header + output + "\n",
                                file_name="extracted.gtf")
             st.code(output, language="text")
         else:
             st.code("(no matching rows)", language="text")
+
+    if st.session_state.download == "fasta":
+        foutput = "\n".join(r["fa_out"])
+        n = len(r["fa_out"])
+        if r["fa_out"]:
+            st.download_button("FASTA_Download", foutput + "\n",
+                               file_name="extracted.fa")
+            st.code(foutput, language="text")
+        else:
+            st.code("(no matching rows)", language="text")
+
 
 
 
