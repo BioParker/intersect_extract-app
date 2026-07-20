@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 import shutil
 import os
-import io
+import re
 import pandas as pd
 
 def animated_title(word: str):
@@ -209,6 +209,9 @@ def mode_selector():
 
     return st.session_state.mode
 
+def _set_download(v):
+    st.session_state.download = v
+
 mode = mode_selector()
 
 if mode == "Intersect":
@@ -359,12 +362,46 @@ if mode == "Intersect":
         if res["stderr"].strip():
             st.warning(res["stderr"].strip())
         out = res["stdout"]
+        out_parse = res["stdout"].splitlines()
         n = out.count("\n") if out.strip() else 0
         st.caption(f"{n} feature(s) retained")
         if out.strip():
+            tx_id_intersect = set()
+            for line in out_parse:
+                tx_id_intersect.add(re.search(r'(?<=transcript_id ")\w+(?=")', line)[0])
             header = f"# $intersect-app {res['cmd']}\n"
-            st.download_button("Download", header + out, file_name=f"intersect.{res['ext']}")
-        st.code(out or "(no overlaps)", language="text")
+
+            i1, i2 = st.columns(2)
+            if "download" not in st.session_state:
+                st.session_state.download = "int_out"
+
+            with i1:
+                st.button(
+                    "Intersect output", key="btn_intout", use_container_width=True,
+                    on_click=_set_download, args=("int_out",),
+                    type="primary" if st.session_state.download == "int_out" else "secondary")
+
+            with i2:
+                st.button(
+                    "Transcript IDs", key="btn_txi", use_container_width=True,
+                    on_click=_set_download, args=("txi",),
+                    type="primary" if st.session_state.download == "txi" else "secondary")
+
+
+            if st.session_state.download == "int_out":
+                st.download_button("Download", header + out, file_name=f"intersect.{res['ext']}")
+                st.code(out or "(no overlaps)", language="text")
+
+            if st.session_state.download == "txi":
+                txioutput = "\n".join(tx_id_intersect)
+                n = len(tx_id_intersect)
+                st.caption(f"{n} transcripts matched")
+                if tx_id_intersect:
+                    st.download_button("Transcript ID Download", txioutput + "\n",
+                                       file_name="intersect_tx.txt")
+                    st.code(txioutput, language="text")
+                else:
+                    st.code("(no matching transcripts)", language="text")
 
 if mode == "Extract":
     animated_title_boxed("Extract")
@@ -468,6 +505,7 @@ if mode == "Extract":
 
         gtf_txt = egtf.getvalue().decode(encoding="utf-8")
         outlines=[]
+        tx_id_extract = set()
         for line in gtf_txt.splitlines():
             if line.startswith("#"):
                 continue
@@ -479,6 +517,7 @@ if mode == "Extract":
                     if attr.strip():
                         aname, _, aval = attr.strip().partition(" ")
                         if aname == atype and aval.strip().strip('"') in vlist:
+                            tx_id_extract.add(re.search(r'(?<=transcript_id ")\w+(?=")',line)[0])
                             outlines.append(line.rstrip("\n"))
 
         faOut=[]
@@ -500,6 +539,7 @@ if mode == "Extract":
         st.session_state.results = {
             "gtf_out": outlines,
             "fa_out": faOut,
+            "txex_out": tx_id_extract,
             "atype": atype,
             "vlist": vlist,
         }
@@ -513,10 +553,7 @@ if mode == "Extract":
 
     if "download" not in st.session_state:
         st.session_state.download = "gtf"
-    d1, d2 = st.columns(2)
-
-    def _set_download(v):
-        st.session_state.download = v
+    d1, d2, d3 = st.columns(3)
 
     with d1:
         st.button(
@@ -529,6 +566,12 @@ if mode == "Extract":
                 "FASTA", key="btn_fasta", use_container_width=True,
                 on_click=_set_download, args=("fasta",),
                 type="primary" if st.session_state.download == "fasta" else "secondary")
+
+    with d3:
+        st.button(
+                "Transcript IDs", key="btn_txe", use_container_width=True,
+                on_click=_set_download, args=("txe",),
+                type="primary" if st.session_state.download == "txe" else "secondary")
 
     if st.session_state.download == "gtf":
         output = "\n".join(r["gtf_out"])
@@ -544,13 +587,24 @@ if mode == "Extract":
 
     if st.session_state.download == "fasta":
         foutput = "\n".join(r["fa_out"])
-        n = len(r["fa_out"])
         if r["fa_out"]:
             st.download_button("FASTA Download", foutput + "\n",
                                file_name="extracted.fa")
             st.code(foutput, language="text")
         else:
             st.code("(no matching rows)", language="text")
+
+    if st.session_state.download == "txe":
+        txexoutput = "\n".join(r["txex_out"])
+        n = len(r["txex_out"])
+        st.caption(f"{n} transcripts matched")
+        if r["txex_out"]:
+            st.download_button("Transcript ID Download", txexoutput + "\n",
+                               file_name="extracted.fa")
+            st.code(txexoutput, language="text")
+        else:
+            st.code("(no matching transcripts)", language="text")
+
 
 
 
